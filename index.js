@@ -23,8 +23,8 @@ const start = 3;
 const count = 4;
 const security = 1;
 
-const tree0 = new MerkleTree(seed, start, count, security);
-const tree1 = new MerkleTree(seed, start + count, count, security);
+let tree0;
+let tree1;
 
 const root = tree0.root.hash.toString();
 
@@ -32,6 +32,8 @@ function init(s) {
   seed = s;
   channelSeed = Encryption.hash(Crypto.converter.trits(seed.slice()));
   channelKey = Crypto.converter.trytes(Encryption.subseed(channelSeed, channelKeyIndex));
+  tree0 = new MerkleTree(seed, start, count, security);
+  tree1 = new MerkleTree(seed, start + count, count, security);
 }
 
 function publish(message) {
