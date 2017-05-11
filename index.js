@@ -74,6 +74,7 @@ function sendCommand(channelKey) {
         channel: MAM.messageID(channelKey)
     }, (err, result) => {
       if(err == undefined) {
+        console.log("MSG Found for: ", channelKey);
         const output = MAM.parse(result.ixi, {key: channelKey});
         const asciiMessage = iota.utils.fromTrytes(output.message);
         console.log(output.root, '->', output.nextRoot);
@@ -86,12 +87,22 @@ function sendCommand(channelKey) {
           subRoot = subRootNext;
           subRootNext = output.nextRoot;
         }
-        else
+        else {
           console.log('Public Keys do not match!');
+          subRoot = output.root;
+          subRootNext = output.nextRoot;
+        }
+        let nextKey = Crypto.converter.trytes(Encryption.subseed(Crypto.converter.trits(channelKey), 1));
+        console.log('NEXTKEY: ', nextKey);
         console.log('Message:', asciiMessage);
+        setTimeout(() => {
+          sendCommand(nextKey).then(resolve);
+        }, 1);
       }
-      else if (err.message !== 'Message not found.') {
-        console.log('Error:', err);
+      else {
+        setTimeout(() => {
+          sendCommand(channelKey).then(resolve);
+        }, 1000);
       }
       resolve();
     });
