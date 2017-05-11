@@ -6,7 +6,7 @@ const Crypto = require('crypto.iota.js');
 const readline = require('readline');
 
 const iota = new IOTA({
-  provider: ''
+  provider: 'http://localhost:14900'
 });
 
 const rl = readline.createInterface({
@@ -14,7 +14,6 @@ const rl = readline.createInterface({
   output: process.stdout
 }).on('close', () => {});
 
-const channelKeyIndex = 3;
 const count = 4;
 const security = 1;
 
@@ -36,16 +35,14 @@ let subRootNext;
 function init(s) {
   seed = s;
   channelSeed = Encryption.hash(Crypto.converter.trits(seed.slice()));
-  channelKey = Crypto.converter.trytes(Encryption.subseed(channelSeed, channelKeyIndex));
-
   pubTree0 = new MerkleTree(seed, pubStart, count, security);
   pubTree1 = new MerkleTree(seed, pubStart + count, count, security);
-
   subTree0 = new MerkleTree(seed, subStart, count, security);
   subRoot = subTree0.root.hash.toString();
 }
 
 function publish(message) {
+  channelKey = Crypto.converter.trytes(Encryption.subseed(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), pubIndex));
   const trytes = new MAM.MaskedAuthenticatedMessage({
     message: iota.utils.toTrytes(message),
     merkleTree: pubTree0,
@@ -55,13 +52,12 @@ function publish(message) {
   });
   pubIndex++;
   if(pubIndex >= pubTree0.root.size()) {
-    pubIndex = 0;
     pubTree0 = pubTree1;
     pubStart += count;
     pubTree1 = new MerkleTree(seed, pubStart + count, count, security);
   }
   return new Promise((resolve) => {
-    iota.api.sendTrytes(trytes, 4, 9, (err, tx) => {
+    iota.api.sendTrytes(trytes, 4, 13, (err, tx) => {
       if (err)
         console.log('Error:', err);
       else
@@ -72,46 +68,40 @@ function publish(message) {
 }
 
 function sendCommand(channelKey) {
-  iota.api.sendCommand({
-      command: "MAM.getMessage",
-      channel: MAM.messageID(channelKey)
-  }, (err, result) => {
-    if(err == undefined) {
-      const output = MAM.parse(result.ixi, {key: channelKey});
-      const asciiMessage = iota.utils.fromTrytes(output.message);
-      console.log(output.root, '->', output.nextRoot);
-      if (subRoot === output.root) {
-        subIndex++;
-        subRootNext = output.nextRoot;
+  console.log(channelKey);
+  return new Promise((resolve) => {
+    iota.api.sendCommand({
+        command: "MAM.getMessage",
+        channel: MAM.messageID(channelKey)
+    }, (err, result) => {
+      if(err == undefined) {
+        const output = MAM.parse(result.ixi, {key: channelKey});
+        const asciiMessage = iota.utils.fromTrytes(output.message);
+        console.log(output.root, '->', output.nextRoot);
+        if (subRoot === output.root) {
+          subIndex++;
+          subRootNext = output.nextRoot;
+        }
+        else if (subRootNext === output.root) {
+          subIndex++;
+          subRoot = subRootNext;
+          subRootNext = output.nextRoot;
+        }
+        else
+          console.log('Public Keys do not match!');
+        console.log('Message:', asciiMessage);
       }
-      else if (subRootNext === output.root) {
-        subIndex = 0;
-        subRoot = subRootNext;
-        subRootNext = output.nextRoot;
+      else if (err.message !== 'Message not found.') {
+        console.log('Error:', err);
       }
-      else
-        console.log('Public Keys do not match!');
-      console.log('Message:', asciiMessage);
-    }
-    else if (err !== 'Message not found.') {
-      console.log('Error:', err);
-    }
+      resolve();
+    });
   });
 }
 
 function subscribe(channelKey) {
   return new Promise((resolve) => {
-    const t = setInterval(() => {
-      sendCommand(channelKey);
-    }, 1000);
-    prompt('', (sig) => {
-      clearInterval(t);
-      console.log(' stopped.');
-      return new Promise((resolve) => {
-        promptCommand();
-        resolve();
-      });
-    }).then(resolve);
+    sendCommand(channelKey).then(resolve);
   });
 }
 
@@ -137,7 +127,6 @@ const commands = {
   },
   exit: () => {
     rl.close();
-    console.log('Bye!');
     return new Promise((resolve) => {});
   }
 };
@@ -152,7 +141,7 @@ function promptCommand() {
 
 function checkSeed(seed) {
   return new Promise((resolve) => {
-    if (! iota.valid.isTrytes(seed) || seed.length === 0)
+    if (! iota.valid.isTrytes(seed) || seed.length !== 81)
       prompt(" - Invalid seed! \nPlease enter your seed: ", checkSeed).then(resolve);
     else {
       init(seed);
@@ -163,7 +152,7 @@ function checkSeed(seed) {
 
 function checkChannelKey(channelKey) {
   return new Promise((resolve) => {
-    if (! iota.valid.isTrytes(channelKey) || channelKey.length === 0)
+    if (! iota.valid.isTrytes(channelKey) || channelKey.length !== 81)
       prompt(" - Invalid channel key! \nType channel key: ", checkChannelKey).then(resolve);
     else
       resolve(channelKey);
