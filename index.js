@@ -43,19 +43,32 @@ function init(s) {
 
 function publish(message) {
   channelKey = Crypto.converter.trytes(Encryption.subseed(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), pubIndex));
+  return new Promise ((resolve) => {
+    iota.api.sendCommand({
+      command: "MAM.getMessage",
+      channel: MAM.messageID(channelKey)
+    }, (err, result) => {
+      if (err == undefined) {
+        setTimeout(() => {
+          incrementPubIndex();
+          publish(message).then(resolve);
+        }, 1);
+      }
+      else
+        publishMAM(message, channelKey).then(resolve);
+    });
+  });
+}
+
+function publishMAM(message, key) {
   const trytes = new MAM.MaskedAuthenticatedMessage({
     message: iota.utils.toTrytes(message),
     merkleTree: pubTree0,
     index: pubIndex,
     nextRoot: pubTree1.root.hash.toString(),
-    channelKey: channelKey
+    channelKey: key
   });
-  pubIndex++;
-  if(pubIndex >= pubTree0.root.size()) {
-    pubTree0 = pubTree1;
-    pubStart += count;
-    pubTree1 = new MerkleTree(seed, pubStart + count, count, security);
-  }
+  incrementPubIndex();
   return new Promise((resolve) => {
     iota.api.sendTrytes(trytes, 4, 13, (err, tx) => {
       if (err)
@@ -67,11 +80,20 @@ function publish(message) {
   });
 }
 
+function incrementPubIndex() {
+  pubIndex++;
+  if(pubIndex >= pubTree0.root.size()) {
+    pubTree0 = pubTree1;
+    pubStart += count;
+    pubTree1 = new MerkleTree(seed, pubStart + count, count, security);
+  }
+}
+
 function sendCommand(channelKey) {
   return new Promise((resolve) => {
     iota.api.sendCommand({
-        command: "MAM.getMessage",
-        channel: MAM.messageID(channelKey)
+      command: "MAM.getMessage",
+      channel: MAM.messageID(channelKey)
     }, (err, result) => {
       if(err == undefined) {
         console.log("MSG Found for: ", channelKey);
@@ -117,7 +139,7 @@ function subscribe(channelKey) {
 
 const commands = {
   get: (i) => {
-    i = i ? i : subIndex;
+    i = i ? i : pubIndex;
     let key = Crypto.converter.trytes(Encryption.subseed(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), i));
     console.log(key);
     return new Promise((resolve) => {resolve();});
