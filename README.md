@@ -12,7 +12,7 @@ cd mam-cli
 
 ```
 
-Install dependancies:
+Install dependencies:
 ```
 npm install
 ```
