@@ -102,7 +102,7 @@ function sendCommand(channelKey) {
       else {
         setTimeout(() => {
           sendCommand(channelKey).then(resolve);
-        }, 1000);
+        }, 500);
       }
       resolve();
     });
