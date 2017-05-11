@@ -68,7 +68,6 @@ function publish(message) {
 }
 
 function sendCommand(channelKey) {
-  console.log(channelKey);
   return new Promise((resolve) => {
     iota.api.sendCommand({
         command: "MAM.getMessage",
