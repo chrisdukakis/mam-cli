@@ -26,19 +26,11 @@ let pubStart = 3;
 let pubTree0;
 let pubTree1;
 
-let subIndex = 0;
-let subStart = 3;
-let subTree0;
-let subRoot;
-let subRootNext;
-
 function init(s) {
   seed = s;
   channelSeed = Encryption.hash(Crypto.converter.trits(seed.slice()));
   pubTree0 = new MerkleTree(seed, pubStart, count, security);
   pubTree1 = new MerkleTree(seed, pubStart + count, count, security);
-  subTree0 = new MerkleTree(seed, subStart, count, security);
-  subRoot = subTree0.root.hash.toString();
 }
 
 function publish(message) {
@@ -89,7 +81,7 @@ function incrementPubIndex() {
   }
 }
 
-function sendCommand(channelKey) {
+function sendCommand(channelKey, subRoot, subRootNext) {
   return new Promise((resolve) => {
     iota.api.sendCommand({
       command: "MAM.getMessage",
@@ -101,16 +93,13 @@ function sendCommand(channelKey) {
         const asciiMessage = iota.utils.fromTrytes(output.message);
         console.log(output.root, '->', output.nextRoot);
         if (subRoot === output.root) {
-          subIndex++;
           subRootNext = output.nextRoot;
         }
         else if (subRootNext === output.root) {
-          subIndex++;
           subRoot = subRootNext;
           subRootNext = output.nextRoot;
         }
         else {
-          console.log('Public Keys do not match!');
           subRoot = output.root;
           subRootNext = output.nextRoot;
         }
@@ -118,12 +107,12 @@ function sendCommand(channelKey) {
         console.log('NEXTKEY: ', nextKey);
         console.log('Message:', asciiMessage);
         setTimeout(() => {
-          sendCommand(nextKey).then(resolve);
+          sendCommand(nextKey, subRoot, subRootNext).then(resolve);
         }, 1);
       }
       else {
         setTimeout(() => {
-          sendCommand(channelKey).then(resolve);
+          sendCommand(channelKey, subRoot, subRootNext).then(resolve);
         }, 500);
       }
       resolve();
