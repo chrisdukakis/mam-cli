@@ -6,7 +6,7 @@ const Crypto = require('crypto.iota.js');
 const readline = require('readline');
 
 const iota = new IOTA({
-  provider: 'http://localhost:14900'
+  provider: 'http://localhost:14600'
 });
 
 const rl = readline.createInterface({
@@ -34,7 +34,7 @@ function init(s) {
 }
 
 function publish(message) {
-  channelKey = Crypto.converter.trytes(Encryption.subseed(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), pubIndex));
+  channelKey = Crypto.converter.trytes(MAM.channelKey(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), pubIndex));
   return new Promise ((resolve) => {
     iota.api.sendCommand({
       command: "MAM.getMessage",
@@ -53,7 +53,7 @@ function publish(message) {
 }
 
 function publishMAM(message, key) {
-  const trytes = new MAM.MaskedAuthenticatedMessage({
+  const trytes = new MAM.create({
     message: iota.utils.toTrytes(message),
     merkleTree: pubTree0,
     index: pubIndex,
@@ -89,7 +89,8 @@ function sendCommand(channelKey, subRoot, subRootNext) {
     }, (err, result) => {
       if(err == undefined) {
         console.log("MSG Found for: ", channelKey);
-        const output = MAM.parse(result.ixi, {key: channelKey});
+        result.ixi.forEach( ixi => {
+        const output = MAM.parse({key: channelKey, message: ixi.message, index: ixi.index});
         const asciiMessage = iota.utils.fromTrytes(output.message);
         console.log(output.root, '->', output.nextRoot);
         if (subRoot === output.root) {
@@ -100,12 +101,14 @@ function sendCommand(channelKey, subRoot, subRootNext) {
           subRootNext = output.nextRoot;
         }
         else {
+          console.log('Public Keys do not match!');
           subRoot = output.root;
           subRootNext = output.nextRoot;
         }
-        let nextKey = Crypto.converter.trytes(Encryption.subseed(Crypto.converter.trits(channelKey), 1));
-        console.log('NEXTKEY: ', nextKey);
         console.log('Message:', asciiMessage);
+        });
+        let nextKey = Crypto.converter.trytes(MAM.channelKey(Crypto.converter.trits(channelKey), 1));
+        console.log('NEXTKEY: ', nextKey);
         setTimeout(() => {
           sendCommand(nextKey, subRoot, subRootNext).then(resolve);
         }, 1);
@@ -129,7 +132,7 @@ function subscribe(channelKey) {
 const commands = {
   get: (i) => {
     i = i ? i : pubIndex;
-    let key = Crypto.converter.trytes(Encryption.subseed(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), i));
+    let key = Crypto.converter.trytes(MAM.channelKey(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), i));
     console.log(key);
     return new Promise((resolve) => {resolve();});
   },
