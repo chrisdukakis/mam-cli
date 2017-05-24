@@ -53,17 +53,17 @@ function publish(message) {
 }
 
 function publishMAM(message, key) {
-  const trytes = new MAM.create({
+  const mam = new MAM.create({
     message: iota.utils.toTrytes(message),
     merkleTree: pubTree0,
     index: pubIndex,
     nextRoot: pubTree1.root.hash.toString(),
     channelKey: key
   });
-  channelKey = trytes.nextKey;
+  channelKey = mam.nextKey;
   incrementPubIndex();
   return new Promise((resolve) => {
-    iota.api.sendTrytes(trytes, 4, 13, (err, tx) => {
+    iota.api.sendTrytes(mam.trytes, 4, 13, (err, tx) => {
       if (err)
         console.log('Error:', err);
       else
