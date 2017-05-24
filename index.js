@@ -1,7 +1,8 @@
 const IOTA = require('iota.lib.js');
-const MAM = require('./mam.client.js/lib/mam');
-const MerkleTree = require('./mam.client.js/lib/merkle');
-const Encryption = require('./mam.client.js/lib/encryption');
+const MamClient = require('mam.client.js');
+const MAM = MamClient.MAM;
+const MerkleTree = MamClient.Merkle;
+const Encryption = MamClient.Encryption;
 const Crypto = require('crypto.iota.js');
 const readline = require('readline');
 
@@ -29,12 +30,12 @@ let pubTree1;
 function init(s) {
   seed = s;
   channelSeed = Encryption.hash(Crypto.converter.trits(seed.slice()));
+  channelKey = Crypto.converter.trytes(channelSeed.slice());
   pubTree0 = new MerkleTree(seed, pubStart, count, security);
   pubTree1 = new MerkleTree(seed, pubStart + count, count, security);
 }
 
 function publish(message) {
-  channelKey = Crypto.converter.trytes(MAM.channelKey(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), pubIndex));
   return new Promise ((resolve) => {
     iota.api.sendCommand({
       command: "MAM.getMessage",
@@ -53,16 +54,17 @@ function publish(message) {
 }
 
 function publishMAM(message, key) {
-  const trytes = new MAM.create({
+  const mam = new MAM.create({
     message: iota.utils.toTrytes(message),
     merkleTree: pubTree0,
     index: pubIndex,
     nextRoot: pubTree1.root.hash.toString(),
     channelKey: key
   });
+  channelKey = mam.nextKey;
   incrementPubIndex();
   return new Promise((resolve) => {
-    iota.api.sendTrytes(trytes, 4, 13, (err, tx) => {
+    iota.api.sendTrytes(mam.trytes, 4, 13, (err, tx) => {
       if (err)
         console.log('Error:', err);
       else
@@ -89,29 +91,29 @@ function sendCommand(channelKey, subRoot, subRootNext) {
     }, (err, result) => {
       if(err == undefined) {
         console.log("MSG Found for: ", channelKey);
-        result.ixi.forEach( ixi => {
-        const output = MAM.parse({key: channelKey, message: ixi.message, index: ixi.index});
-        const asciiMessage = iota.utils.fromTrytes(output.message);
-        console.log(output.root, '->', output.nextRoot);
-        if (subRoot === output.root) {
-          subRootNext = output.nextRoot;
-        }
-        else if (subRootNext === output.root) {
-          subRoot = subRootNext;
-          subRootNext = output.nextRoot;
-        }
-        else {
-          console.log('Public Keys do not match!');
-          subRoot = output.root;
-          subRootNext = output.nextRoot;
-        }
-        console.log('Message:', asciiMessage);
+        result.ixi.forEach( mam => {
+          const output = MAM.parse({key: channelKey, message: mam.message, tag: mam.tag});
+          const asciiMessage = iota.utils.fromTrytes(output.message);
+          console.log(output.root, '->', output.nextRoot);
+          if (subRoot === output.root) {
+            subRootNext = output.nextRoot;
+          }
+          else if (subRootNext === output.root) {
+            subRoot = subRootNext;
+            subRootNext = output.nextRoot;
+          }
+          else {
+            console.log('Public Keys do not match!');
+            subRoot = output.root;
+            subRootNext = output.nextRoot;
+          }
+          console.log('Message:', asciiMessage);
+          let nextKey = output.nextKey; //Crypto.converter.trytes(MAM.channelKey(Crypto.converter.trits(channelKey), 1));
+          console.log('NEXTKEY: ', nextKey);
+          setTimeout(() => {
+            sendCommand(nextKey, subRoot, subRootNext).then(resolve);
+          }, 1);
         });
-        let nextKey = Crypto.converter.trytes(MAM.channelKey(Crypto.converter.trits(channelKey), 1));
-        console.log('NEXTKEY: ', nextKey);
-        setTimeout(() => {
-          sendCommand(nextKey, subRoot, subRootNext).then(resolve);
-        }, 1);
       }
       else {
         setTimeout(() => {
@@ -131,9 +133,7 @@ function subscribe(channelKey) {
 
 const commands = {
   get: (i) => {
-    i = i ? i : pubIndex;
-    let key = Crypto.converter.trytes(MAM.channelKey(Encryption.hash(Encryption.increment(Crypto.converter.trits(seed.slice()))), i));
-    console.log(key);
+    console.log(channelKey);
     return new Promise((resolve) => {resolve();});
   },
   pub: () => {

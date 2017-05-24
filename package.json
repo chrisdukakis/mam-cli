@@ -11,6 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "crypto.iota.js": "0.0.4",
-    "iota.lib.js": "^0.2.6"
+    "iota.lib.js": "^0.2.6",
+    "mam.client.js": "^0.2.2"
   }
 }
