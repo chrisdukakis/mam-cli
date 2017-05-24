@@ -1,7 +1,8 @@
 const IOTA = require('iota.lib.js');
-const MAM = require('./mam.client.js/lib/mam');
-const MerkleTree = require('./mam.client.js/lib/merkle');
-const Encryption = require('./mam.client.js/lib/encryption');
+const MamClient = require('mam.client.js');
+const MAM = MamClient.MAM;
+const MerkleTree = MamClient.Merkle;
+const Encryption = MamClient.Encryption;
 const Crypto = require('crypto.iota.js');
 const readline = require('readline');
 
