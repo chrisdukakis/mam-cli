@@ -9,6 +9,8 @@ const readline = require('readline');
 const iota = new IOTA({
   provider: 'http://localhost:14600'
 });
+const DEPTH = 4;
+const MWM = 13;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -64,7 +66,7 @@ function publishMAM(message, key) {
   channelKey = mam.nextKey;
   incrementPubIndex();
   return new Promise((resolve) => {
-    iota.api.sendTrytes(mam.trytes, 4, 13, (err, tx) => {
+    iota.api.sendTrytes(mam.trytes, DEPTH, MWM, (err, tx) => {
       if (err)
         console.log('Error:', err);
       else
